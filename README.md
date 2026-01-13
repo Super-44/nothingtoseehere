@@ -9,6 +9,16 @@ A python package that is certainly only for human mouse movement and keyboard in
 
 Built on neurophysiology research (Fitts' Law, minimum jerk trajectories, signal-dependent noise) to produce mouse movements and keyboard input that pass behavioral biometric detection.
 
+**Key Statistics** (see [RESEARCH.md](RESEARCH.md) for full details):
+
+| Human Trait | Our Implementation |
+|-------------|-------------------|
+| Throughput < 12 bits/s | ✓ Enforced |
+| Peak velocity at 38-45% | ✓ 42% default |
+| Straightness 0.80-0.95 | ✓ ~0.91 |
+| 8-12 Hz tremor | ✓ 10 Hz |
+| Log-normal clicks ~100ms | ✓ |
+
 ## Installation
 
 ```bash

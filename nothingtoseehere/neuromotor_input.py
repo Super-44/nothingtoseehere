@@ -684,13 +684,14 @@ class PathGeometry:
     
     def __init__(
         self,
-        curvature_scale: float = 0.08,
-        midpoint_deviation: float = 0.06
+        curvature_scale: float = 0.15,
+        midpoint_deviation: float = 0.12
     ):
         """
         Args:
             curvature_scale: Overall curvature as fraction of distance
             midpoint_deviation: Max perpendicular deviation as fraction of distance
+                               (research: humans have straightness index 0.80-0.95)
         """
         self.curvature_scale = curvature_scale
         self.midpoint_deviation = midpoint_deviation
@@ -731,22 +732,25 @@ class PathGeometry:
         # Bell-shaped deviation (4t(1-t) peaks at t=0.5 with max value 1)
         base_deviation = 4 * t * (1 - t)
         
-        # Human paths deviate 3-8% from straight line typically
+        # Human paths deviate significantly - straightness index should be 0.80-0.95
+        # Research shows paths are NOT straight lines, they have biomechanical arcs
         curvature_sign = random.choice([-1, 1])
         curvature_magnitude = abs(random.gauss(
             self.midpoint_deviation * distance,
-            self.midpoint_deviation * distance * 0.4
+            self.midpoint_deviation * distance * 0.5
         ))
         
-        # Ensure minimum deviation for human-like paths
-        curvature_magnitude = max(curvature_magnitude, distance * 0.02)
-        curvature_magnitude = min(curvature_magnitude, distance * 0.15)
+        # Ensure minimum deviation for human-like paths (research: straightness 0.80-0.95)
+        # Min 5% deviation ensures we don't look robotic
+        curvature_magnitude = max(curvature_magnitude, distance * 0.05)
+        curvature_magnitude = min(curvature_magnitude, distance * 0.25)
         
         deviation = base_deviation * curvature_sign * curvature_magnitude
         
-        # Add very small random perturbations for micro-variation
-        perturbation = np.random.randn(n_points) * distance * 0.004
-        perturbation = np.convolve(perturbation, np.ones(5)/5, mode='same')
+        # Add micro-corrections for fractal complexity (research: FD 1.2-1.4)
+        # These simulate the small corrective submovements during travel
+        perturbation = np.random.randn(n_points) * distance * 0.008
+        perturbation = np.convolve(perturbation, np.ones(3)/3, mode='same')
         deviation += perturbation
         
         # Generate path
@@ -1099,9 +1103,9 @@ class NeuromotorConfig:
     tremor_frequency: float = 10.0
     tremor_amplitude: float = 0.15
     
-    # Path geometry
+    # Path geometry (research: straightness index 0.80-0.95, not 1.0)
     path_curvature: float = 0.15
-    path_deviation: float = 0.10
+    path_deviation: float = 0.12
     
     # Submovement model
     primary_coverage: float = 0.95
