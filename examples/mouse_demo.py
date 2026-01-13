@@ -171,25 +171,29 @@ async def demo_diagnostics():
     distance = np.sqrt((end[0]-start[0])**2 + (end[1]-start[1])**2)
     duration = fitts.movement_time(distance, 50)
     
-    # Generate path
+    # Generate the minimum jerk velocity profile (this has the asymmetry!)
     n_points = int(duration * 60)
+    times, positions, velocities = trajectory.generate_profile(duration, 60)
+    
+    # Scale velocities by distance (trajectory gives normalized 0-1 positions)
+    velocities_scaled = velocities * distance
+    
+    # Generate curved path shape
     x, y = path_gen.generate_curved_path(start, end, n_points)
-    times = np.linspace(0, duration, n_points)
     
     # Calculate metrics
-    dx, dy, dt = np.diff(x), np.diff(y), np.diff(times)
-    velocities = np.sqrt(dx**2 + dy**2) / (dt + 1e-6)
-    
     _, throughput = fitts.validate_human_plausible(distance, 50, duration)
     straightness = path_gen.straightness_index(x, y)
+    
+    # Peak timing from the TRAJECTORY (not path geometry)
     peak_idx = np.argmax(velocities)
-    peak_timing = peak_idx / len(velocities)
+    peak_timing = times[peak_idx] / duration
     
     print(f"   Movement: {distance:.0f}px distance, {duration*1000:.0f}ms duration")
     print(f"   Throughput: {throughput:.1f} bits/s (human max: ~12)")
     print(f"   Peak velocity timing: {peak_timing*100:.0f}% (human: 38-45%)")
     print(f"   Path straightness: {straightness:.3f} (human: 0.80-0.95)")
-    print(f"   Peak velocity: {np.max(velocities):.0f} px/s")
+    print(f"   Peak velocity: {np.max(velocities_scaled):.0f} px/s")
     
     is_human_like = throughput < 12 and 0.35 < peak_timing < 0.55 and 0.75 < straightness < 0.98
     print(f"\n   Human-plausible: {'✓ YES' if is_human_like else '✗ NO'}")
