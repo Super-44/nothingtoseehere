@@ -129,8 +129,8 @@ class MinimumJerkTrajectory:
 
 
 class NeuromotorNoise:
-    def __init__(self, noise_coefficient=0.05, tremor_frequency=10.0, 
-                 tremor_amplitude=0.5, sample_rate=60.0):
+    def __init__(self, noise_coefficient=0.02, tremor_frequency=10.0,
+                 tremor_amplitude=0.15, sample_rate=60.0):
         self.noise_coefficient = noise_coefficient
         self.tremor_frequency = tremor_frequency
         self.tremor_amplitude = tremor_amplitude

@@ -23,6 +23,7 @@ References:
 
 import asyncio
 import math
+import platform
 import random
 import time
 from dataclasses import dataclass, field
@@ -30,9 +31,12 @@ from enum import Enum
 from typing import Tuple, List, Optional, Callable, Generator
 import numpy as np
 from scipy import signal as scipy_signal
-from scipy.interpolate import CubicSpline
 from scipy.stats import lognorm, expon
 import pyautogui
+
+# Detect platform for keyboard shortcuts
+IS_MACOS = platform.system() == 'Darwin'
+MODIFIER_KEY = 'command' if IS_MACOS else 'ctrl'
 
 # Disable PyAutoGUI's fail-safe (we're in a container)
 pyautogui.FAILSAFE = False
@@ -366,16 +370,16 @@ class NeuromotorNoise:
     
     def __init__(
         self,
-        noise_coefficient: float = 0.05,
+        noise_coefficient: float = 0.02,
         tremor_frequency: float = 10.0,
-        tremor_amplitude: float = 0.5,
+        tremor_amplitude: float = 0.15,
         sample_rate: float = 60.0
     ):
         """
         Args:
-            noise_coefficient: k in σ = k * |v|
+            noise_coefficient: k in σ = k * |v| (0.02 = 2% of velocity, realistic)
             tremor_frequency: Center frequency of tremor (Hz)
-            tremor_amplitude: RMS amplitude of tremor (pixels)
+            tremor_amplitude: RMS amplitude of tremor (pixels, 0.1-0.2 is human range)
             sample_rate: Samples per second
         """
         self.noise_coefficient = noise_coefficient
@@ -1088,10 +1092,12 @@ class NeuromotorConfig:
     # Velocity profile asymmetry (0.38-0.45 for humans)
     velocity_asymmetry: float = 0.42
     
-    # Noise parameters
-    noise_coefficient: float = 0.05
+    # Noise parameters (research-based defaults)
+    # - noise_coefficient: ~2% of velocity is realistic
+    # - tremor_amplitude: 0.1-0.2 pixels RMS is typical human tremor
+    noise_coefficient: float = 0.02
     tremor_frequency: float = 10.0
-    tremor_amplitude: float = 0.5
+    tremor_amplitude: float = 0.15
     
     # Path geometry
     path_curvature: float = 0.15
@@ -1530,8 +1536,8 @@ class NeuromotorInput:
         await asyncio.sleep(self.reaction.sample())
         
         if clear_first:
-            # Select all
-            await self.keyboard.hotkey('ctrl', 'a')
+            # Select all (use Cmd on macOS, Ctrl elsewhere)
+            await self.keyboard.hotkey(MODIFIER_KEY, 'a')
             await asyncio.sleep(random.uniform(0.1, 0.2))
             await self.keyboard.press_key('backspace')
             await asyncio.sleep(random.uniform(0.1, 0.2))

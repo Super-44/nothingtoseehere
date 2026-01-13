@@ -39,7 +39,7 @@ Then copy the `neuromotor/` package to your project.
 
 ```python
 import asyncio
-from neuromotor import NeuromotorInput
+from nothingtoseehere import NeuromotorInput
 
 async def main():
     human = NeuromotorInput()
@@ -58,7 +58,7 @@ asyncio.run(main())
 ### 1. Fitts' Law Movement Timing
 
 ```python
-from neuromotor import FittsLaw, FittsParams
+from nothingtoseehere import FittsLaw, FittsParams
 
 # Configure Fitts' Law parameters
 params = FittsParams(
@@ -87,7 +87,7 @@ print(f"Throughput: {throughput:.1f} bps (valid: {is_valid})")
 Real humans reach peak velocity at 38-45% of movement time (not 50%):
 
 ```python
-from neuromotor import MinimumJerkTrajectory
+from nothingtoseehere import MinimumJerkTrajectory
 
 # Asymmetric profile (peak at 42% of movement)
 trajectory = MinimumJerkTrajectory(asymmetry=0.42)
@@ -109,7 +109,7 @@ print(f"Peak velocity at: {peak_time*100:.0f}% of movement")
 Movements consist of a fast ballistic phase followed by slower corrections:
 
 ```python
-from neuromotor import TwoComponentModel
+from nothingtoseehere import TwoComponentModel
 
 model = TwoComponentModel(
     primary_coverage=0.95,   # Primary covers ~95% of distance
@@ -133,7 +133,7 @@ for endpoint, time_fraction in submovements:
 Noise scales with movement velocity (faster = shakier):
 
 ```python
-from neuromotor import NeuromotorNoise
+from nothingtoseehere import NeuromotorNoise
 
 noise = NeuromotorNoise(
     noise_coefficient=0.05,    # σ = 0.05 * velocity
@@ -153,7 +153,7 @@ noisy_x, noisy_y = noise.add_noise_to_trajectory(
 Click durations follow log-normal distribution (not uniform):
 
 ```python
-from neuromotor import ClickModel, ClickTimingParams
+from nothingtoseehere import ClickModel, ClickTimingParams
 
 params = ClickTimingParams(
     click_duration_mu=4.6,      # log(100ms)
@@ -177,7 +177,7 @@ print(f"Pre-click dwell: {dwell*1000:.0f}ms")
 ### Full Configuration Example
 
 ```python
-from neuromotor import (
+from nothingtoseehere import (
     NeuromotorInput,
     NeuromotorConfig,
     FittsParams,
@@ -254,7 +254,7 @@ elder_config = NeuromotorConfig(
 Verify your movements are human-plausible:
 
 ```python
-from neuromotor import MovementDiagnostics
+from nothingtoseehere import MovementDiagnostics
 import numpy as np
 
 diagnostics = MovementDiagnostics()
@@ -283,7 +283,7 @@ print(f"Overall: {'PASS' if analysis['overall_valid'] else 'FAIL'}")
 ### With nodriver
 
 ```python
-from neuromotor import NeuromotorInput
+from nothingtoseehere import NeuromotorInput
 import nodriver as uc
 
 async def click_with_human_input(page, selector: str):
@@ -306,7 +306,7 @@ async def click_with_human_input(page, selector: str):
 ### With Selenium
 
 ```python
-from neuromotor import NeuromotorInput
+from nothingtoseehere import NeuromotorInput
 from selenium import webdriver
 
 async def click_element(driver, element):

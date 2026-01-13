@@ -20,7 +20,7 @@ Key features:
 - Realistic path curvature (fractal dimension 1.2-1.4)
 
 Usage:
-    from neuromotor import NeuromotorInput
+    from nothingtoseehere import NeuromotorInput
     
     human = NeuromotorInput()
     await human.mouse.move_to(500, 300, target_width=100, click=True)
