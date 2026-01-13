@@ -173,8 +173,9 @@ class TestTwoComponentModel:
         first_endpoint = submovements[0][0]
         distance_covered = first_endpoint[0] - start[0]
         
-        # Should be 85-105% of distance (allows for overshoot)
-        assert 700 <= distance_covered <= 1100
+        # Should be 70-115% of distance (allows for undershoot and overshoot)
+        # Model's primary_gain_range is (0.7, 1.15) by default
+        assert 700 <= distance_covered <= 1150
 
 
 class TestPathGeometry:
