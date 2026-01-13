@@ -33,14 +33,14 @@ async def get_element_screen_position(element, page) -> tuple[int, int, int, int
     box = await element.get_position()
     
     # Get the browser window position
-    # nodriver returns window bounds as {left, top, width, height}
-    window_bounds = await page.get_window()
+    # nodriver returns (WindowID, Bounds) tuple where Bounds has .left, .top, etc.
+    _, bounds = await page.get_window()
     
     # Account for browser chrome (toolbar, etc.) - approximately 85px on most browsers
     chrome_height = 85
     
-    screen_x = int(window_bounds['left'] + box.x)
-    screen_y = int(window_bounds['top'] + chrome_height + box.y)
+    screen_x = int(bounds.left + box.x)
+    screen_y = int(bounds.top + chrome_height + box.y)
     
     return screen_x, screen_y, int(box.width), int(box.height)
 
@@ -154,9 +154,9 @@ async def main():
     
     try:
         # Move mouse to middle of page first
-        window = await page.get_window()
-        center_x = window['left'] + window['width'] // 2
-        center_y = window['top'] + window['height'] // 2
+        _, bounds = await page.get_window()
+        center_x = bounds.left + bounds.width // 2
+        center_y = bounds.top + bounds.height // 2
         
         await human.mouse.move_to(center_x, center_y, target_width=100)
         await asyncio.sleep(0.5)
