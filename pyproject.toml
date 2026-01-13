@@ -1,6 +1,29 @@
 [project]
-name = "placeholder"
+name = "nothingtoseehere"
 version = "0.1"
+description = "A python package that is certainly only for human mouse movement and keyboard input."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "Super44"}]
+license = "Apache-2.0"
+classifiers = []
+dependencies = [
 
-[project.optional-dependencies]
-test = ["pytest"]
+]
+
+[dependency-groups]
+dev = [
+    "pytest"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[project.urls]
+Homepage = "https://github.com/Super-44/nothingtoseehere"
+Changelog = "https://github.com/Super-44/nothingtoseehere/releases"
+Issues = "https://github.com/Super-44/nothingtoseehere/issues"
+CI = "https://github.com/Super-44/nothingtoseehere/actions"
+
