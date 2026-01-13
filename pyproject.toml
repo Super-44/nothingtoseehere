@@ -8,17 +8,20 @@ authors = [{name = "Super44"}]
 license = "Apache-2.0"
 keywords = ["mouse", "keyboard", "automation", "human-like", "bot-detection", "neuromotor", "fitts-law"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Human Machine Interfaces",
     "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Testing :: Traffic Generation",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Life"
     "Typing :: Typed",
 ]
 dependencies = [
@@ -38,9 +41,15 @@ dev = [
 ]
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nothingtoseehere*"]
+
+[tool.setuptools.package-data]
+nothingtoseehere = ["py.typed"]
 
 [project.urls]
 Homepage = "https://github.com/Super-44/nothingtoseehere"
