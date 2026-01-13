@@ -1,8 +1,8 @@
 """
-Neuromotor Input Simulation Library
+nothingtoseehere - Human-like Input Simulation
 
 A research-grounded implementation of human-like mouse and keyboard input
-for browser automation that evades behavioral biometric detection.
+for browser automation. Nothing to see here, just completely normal human behavior.
 
 Based on:
 - Fitts' Law (1954): Information capacity of human motor system

@@ -1,5 +1,5 @@
 """
-Neuromotor Input Simulation Library
+nothingtoseehere - Core Implementation
 
 A research-grounded implementation of human-like mouse and keyboard input.
 Based on neurophysiology, HCI research, and behavioral biometrics literature.

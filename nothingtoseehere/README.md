@@ -1,6 +1,6 @@
-# Neuromotor Input Simulation Library
+# nothingtoseehere - Technical Documentation
 
-A research-grounded Python library for simulating human-like mouse and keyboard input that evades behavioral biometric detection systems.
+A research-grounded Python library for simulating human-like mouse and keyboard input. Nothing to see here, just completely normal human behavior. 🐭
 
 ## The Problem
 
