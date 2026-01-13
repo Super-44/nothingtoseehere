@@ -57,19 +57,29 @@ from .neuromotor_input import (
     # Convenience functions
     human_move_and_click,
     human_type,
+    
+    # Type aliases
+    ButtonType,
+    
+    # Constants (for advanced configuration)
+    IS_MACOS,
+    MODIFIER_KEY,
 )
 
 __version__ = "1.0.0"
 __author__ = "Super44"
 __all__ = [
+    # Main API
     "NeuromotorMouse",
     "NeuromotorKeyboard", 
     "NeuromotorInput",
+    # Configuration
     "NeuromotorConfig",
     "FittsParams",
     "ClickTimingParams",
     "KeyboardTimingParams",
     "ReactionTimeParams",
+    # Component models
     "FittsLaw",
     "MinimumJerkTrajectory",
     "NeuromotorNoise",
@@ -78,8 +88,15 @@ __all__ = [
     "ClickModel",
     "KeyboardModel",
     "ReactionTimeModel",
+    # Utilities
     "Distributions",
     "MovementDiagnostics",
+    # Convenience functions
     "human_move_and_click",
     "human_type",
+    # Type aliases
+    "ButtonType",
+    # Constants
+    "IS_MACOS",
+    "MODIFIER_KEY",
 ]

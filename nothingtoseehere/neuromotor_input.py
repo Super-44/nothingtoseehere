@@ -25,20 +25,39 @@ import asyncio
 import math
 import platform
 import random
-import time
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Tuple, List, Optional, Callable, Generator
+from typing import Tuple, List, Optional, Any, Literal
 import numpy as np
 from scipy import signal as scipy_signal
-from scipy.stats import lognorm, expon
+from scipy.stats import lognorm
 import pyautogui
 
-# Detect platform for keyboard shortcuts
+# =============================================================================
+# CONSTANTS
+# =============================================================================
+
+# Platform detection
 IS_MACOS = platform.system() == 'Darwin'
 MODIFIER_KEY = 'command' if IS_MACOS else 'ctrl'
 
-# Disable PyAutoGUI's fail-safe (we're in a container)
+# Type aliases
+ButtonType = Literal['left', 'right', 'middle']
+
+# Research-derived constants
+EFFECTIVE_WIDTH_CONSTANT = 4.133  # Captures 96% of hits (We = 4.133 * σ)
+HUMAN_THROUGHPUT_CEILING = 12.0  # bits/second - hard physiological limit
+MIN_MOVEMENT_DISTANCE = 3  # pixels - below this, no movement needed
+MIN_SUBMOVEMENT_DISTANCE = 5  # pixels - threshold for submovement planning
+
+# Timing constants (seconds)
+MIN_CLICK_DURATION = 0.050  # Physical minimum
+MAX_CLICK_DURATION = 0.350  # Before it's considered a long-press
+MIN_REACTION_TIME = 0.100  # Absolute minimum human RT
+MIN_INTER_KEY_INTERVAL = 0.030  # Physical typing minimum
+
+# PyAutoGUI configuration
+# Set FAILSAFE=False for automation (move mouse to corner won't abort)
+# Set PAUSE=0 for no artificial delays (we add our own human-like delays)
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0
 
@@ -214,7 +233,7 @@ class FittsLaw:
         This gives the standard deviation for bivariate normal
         endpoint sampling.
         """
-        return target_width / 4.133
+        return target_width / EFFECTIVE_WIDTH_CONSTANT
     
     def throughput(self, distance: float, width: float, time: float) -> float:
         """
@@ -477,15 +496,6 @@ class NeuromotorNoise:
 # TWO-COMPONENT SUBMOVEMENT MODEL
 # =============================================================================
 
-@dataclass
-class SubmovementResult:
-    """Result of a submovement (ballistic or corrective)."""
-    endpoint: Tuple[float, float]
-    duration: float
-    is_primary: bool
-    error: float  # Distance from intended target
-
-
 class TwoComponentModel:
     """
     Meyer et al. (1988) Optimized Submovement Model.
@@ -506,7 +516,15 @@ class TwoComponentModel:
         primary_coverage: float = 0.95,
         primary_error_std: float = 0.08,
         correction_probability: float = 0.85,
-        max_corrections: int = 3
+        max_corrections: int = 3,
+        # Primary submovement timing (fraction of total time)
+        primary_time_range: Tuple[float, float] = (0.70, 0.85),
+        # Correction timing (fraction of remaining time)
+        correction_time_range: Tuple[float, float] = (0.4, 0.7),
+        # Gain limits for primary (allows overshoot up to 15%)
+        primary_gain_range: Tuple[float, float] = (0.7, 1.15),
+        # Lateral error as fraction of distance
+        lateral_error_fraction: float = 0.03,
     ):
         """
         Args:
@@ -514,11 +532,19 @@ class TwoComponentModel:
             primary_error_std: Std dev of primary endpoint as fraction of distance
             correction_probability: Probability of needing correction
             max_corrections: Maximum number of corrective submovements
+            primary_time_range: (min, max) fraction of total time for primary
+            correction_time_range: (min, max) fraction of remaining time per correction
+            primary_gain_range: (min, max) gain for primary (>1 = overshoot)
+            lateral_error_fraction: Lateral error std as fraction of distance
         """
         self.primary_coverage = primary_coverage
         self.primary_error_std = primary_error_std
         self.correction_probability = correction_probability
         self.max_corrections = max_corrections
+        self.primary_time_range = primary_time_range
+        self.correction_time_range = correction_time_range
+        self.primary_gain_range = primary_gain_range
+        self.lateral_error_fraction = lateral_error_fraction
     
     def plan_submovements(
         self,
@@ -536,7 +562,7 @@ class TwoComponentModel:
             (target[0] - start[0])**2 + (target[1] - start[1])**2
         )
         
-        if distance < 5:
+        if distance < MIN_SUBMOVEMENT_DISTANCE:
             # Too close for submovements
             return [(target, 1.0)]
         
@@ -549,8 +575,8 @@ class TwoComponentModel:
             current_pos, target, distance
         )
         
-        # Primary takes majority of time (70-85%)
-        primary_time = random.uniform(0.70, 0.85)
+        # Primary takes majority of time
+        primary_time = random.uniform(*self.primary_time_range)
         submovements.append((primary_endpoint, primary_time))
         remaining_time_fraction -= primary_time
         current_pos = primary_endpoint
@@ -573,7 +599,7 @@ class TwoComponentModel:
             )
             
             # Each correction takes a fraction of remaining time
-            correction_time = remaining_time_fraction * random.uniform(0.4, 0.7)
+            correction_time = remaining_time_fraction * random.uniform(*self.correction_time_range)
             submovements.append((correction_endpoint, correction_time))
             remaining_time_fraction -= correction_time
             
@@ -605,12 +631,11 @@ class TwoComponentModel:
         dy = target[1] - start[1]
         
         # Gain: how much of the distance we cover (typically undershoots)
-        # Mean around 0.95, std around 0.08
         gain = random.gauss(self.primary_coverage, self.primary_error_std)
-        gain = np.clip(gain, 0.7, 1.15)  # Allow some overshoot
+        gain = np.clip(gain, *self.primary_gain_range)
         
         # Lateral error (perpendicular to movement direction)
-        lateral_error = random.gauss(0, distance * 0.03)
+        lateral_error = random.gauss(0, distance * self.lateral_error_fraction)
         
         # Calculate endpoint
         if distance > 0:
@@ -823,8 +848,8 @@ class ClickTimingParams:
     # Click duration (mousedown to mouseup)
     click_duration_mu: float = 4.6  # log(100ms) ≈ 4.6
     click_duration_sigma: float = 0.25
-    click_duration_min: float = 0.050  # 50ms floor
-    click_duration_max: float = 0.350  # 350ms ceiling
+    click_duration_min: float = MIN_CLICK_DURATION  # Physical floor
+    click_duration_max: float = MAX_CLICK_DURATION  # Before long-press
     
     # Verification dwell before click
     verification_dwell_mu: float = 5.5  # log(250ms) ≈ 5.5
@@ -949,7 +974,7 @@ class ReactionTimeModel:
             self.params.tau
         )
         
-        return max(0.10, rt)  # Minimum 100ms
+        return max(MIN_REACTION_TIME, rt)
 
 
 # =============================================================================
@@ -1056,7 +1081,7 @@ class KeyboardModel:
                 self.params.think_pause_sigma
             )
         
-        return max(0.030, base)
+        return max(MIN_INTER_KEY_INTERVAL, base)
     
     def key_hold_duration(self) -> float:
         """Generate key hold duration."""
@@ -1200,7 +1225,7 @@ class NeuromotorMouse:
         target_width: float = 50.0,
         target_height: Optional[float] = None,
         click: bool = False,
-        button: str = 'left'
+        button: ButtonType = 'left'
     ) -> None:
         """
         Move to target with human-like kinematics.
@@ -1227,8 +1252,8 @@ class NeuromotorMouse:
             (endpoint[0] - start[0])**2 + (endpoint[1] - start[1])**2
         )
         
-        if distance < 3:
-            # Too close to move
+        if distance < MIN_MOVEMENT_DISTANCE:
+            # Too close to move meaningfully
             if click:
                 await self._execute_click(button)
             return
@@ -1315,7 +1340,7 @@ class NeuromotorMouse:
             if i < len(time_delays):
                 await asyncio.sleep(time_delays[i])
     
-    async def _execute_click(self, button: str = 'left') -> None:
+    async def _execute_click(self, button: ButtonType = 'left') -> None:
         """Execute click with human-like timing."""
         
         # Verification dwell
@@ -1330,7 +1355,7 @@ class NeuromotorMouse:
     
     async def click(
         self,
-        button: str = 'left',
+        button: ButtonType = 'left',
         clicks: int = 1
     ) -> None:
         """
@@ -1480,7 +1505,7 @@ class NeuromotorMouse:
         y: int,
         target_width: float = 50.0,
         target_height: Optional[float] = None,
-        button: str = 'left'
+        button: ButtonType = 'left'
     ) -> None:
         """
         Drag from current position to target with human-like movement.
@@ -1512,7 +1537,7 @@ class NeuromotorMouse:
             (endpoint[0] - start[0])**2 + (endpoint[1] - start[1])**2
         )
         
-        if distance > 3:
+        if distance > MIN_MOVEMENT_DISTANCE:
             # Drag movements take longer (more careful)
             total_duration = self.fitts.movement_time(
                 distance, min(target_width, target_height)
@@ -1643,7 +1668,7 @@ class NeuromotorInput:
     async def click_element(
         self,
         element_bounds: Tuple[int, int, int, int],
-        button: str = 'left'
+        button: ButtonType = 'left'
     ) -> None:
         """
         Click within an element's bounds with realistic targeting.
@@ -1666,11 +1691,41 @@ class NeuromotorInput:
             button=button
         )
     
+    async def _get_nodriver_screen_coords(
+        self,
+        element: Any,
+        page: Any,
+        chrome_height: int = 85
+    ) -> Tuple[int, int, int, int]:
+        """
+        Convert nodriver element to screen coordinates.
+        
+        Args:
+            element: nodriver Element object
+            page: nodriver Page object
+            chrome_height: Browser chrome/toolbar height (varies by browser/OS,
+                          typically 85px for Chrome, 75px for Firefox)
+        
+        Returns:
+            (center_x, center_y, width, height) in screen coordinates
+        """
+        # Get element position within page
+        box = await element.get_position()
+        
+        # Get window bounds - nodriver returns (WindowID, Bounds) tuple
+        _, bounds = await page.get_window()
+        
+        # Convert to screen coordinates
+        screen_x = int(bounds.left + box.x + box.width / 2)
+        screen_y = int(bounds.top + chrome_height + box.y + box.height / 2)
+        
+        return screen_x, screen_y, int(box.width), int(box.height)
+    
     async def click_nodriver_element(
         self,
-        element,
-        page,
-        button: str = 'left',
+        element: Any,
+        page: Any,
+        button: ButtonType = 'left',
         chrome_height: int = 85
     ) -> None:
         """
@@ -1682,38 +1737,33 @@ class NeuromotorInput:
             element: nodriver Element object
             page: nodriver Page object (for window position)
             button: Mouse button to click
-            chrome_height: Browser chrome height in pixels (default 85)
+            chrome_height: Browser chrome height in pixels (default 85,
+                          may need adjustment for different browsers)
         
         Example:
             button = await page.select('button.submit')
             await human.click_nodriver_element(button, page)
         """
-        # Get element position within page
-        box = await element.get_position()
-        
-        # Get window bounds - nodriver returns (WindowID, Bounds) tuple
-        _, bounds = await page.get_window()
-        
-        # Convert to screen coordinates
-        screen_x = int(bounds.left + box.x)
-        screen_y = int(bounds.top + chrome_height + box.y)
+        x, y, width, height = await self._get_nodriver_screen_coords(
+            element, page, chrome_height
+        )
         
         await self.mouse.move_to(
-            screen_x + int(box.width) // 2,
-            screen_y + int(box.height) // 2,
-            target_width=box.width,
-            target_height=box.height,
+            x, y,
+            target_width=width,
+            target_height=height,
             click=True,
             button=button
         )
     
     async def fill_nodriver_input(
         self,
-        element,
-        page,
+        element: Any,
+        page: Any,
         text: str,
         clear_first: bool = True,
-        chrome_height: int = 85
+        chrome_height: int = 85,
+        with_typos: bool = True
     ) -> None:
         """
         Click a nodriver input element and type text.
@@ -1724,6 +1774,7 @@ class NeuromotorInput:
             text: Text to type
             clear_first: Whether to clear existing text first
             chrome_height: Browser chrome height in pixels
+            with_typos: Whether to simulate occasional typos
         
         Example:
             search_box = await page.select('input[name="q"]')
@@ -1741,7 +1792,7 @@ class NeuromotorInput:
             await self.keyboard.press_key('backspace')
             await asyncio.sleep(random.uniform(0.1, 0.2))
         
-        await self.keyboard.type_text(text)
+        await self.keyboard.type_text(text, with_typos=with_typos)
     
     async def fill_input(
         self,
@@ -1795,7 +1846,7 @@ async def human_move_and_click(
     x: int,
     y: int,
     target_width: float = 50.0,
-    button: str = 'left'
+    button: ButtonType = 'left'
 ) -> None:
     """Quick function to move and click with human-like behavior."""
     mouse = NeuromotorMouse()
