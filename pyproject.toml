@@ -1,12 +1,26 @@
 [project]
 name = "nothingtoseehere"
-version = "0.1"
-description = "A python package that is certainly only for human mouse movement and keyboard input."
+version = "1.0.0"
+description = "Human-like mouse and keyboard input simulation based on neuromotor research. Nothing to see here. 🐭"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "Super44"}]
 license = "Apache-2.0"
-classifiers = []
+keywords = ["mouse", "keyboard", "automation", "human-like", "bot-detection", "neuromotor", "fitts-law"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
+]
 dependencies = [
     "numpy>=1.24.0",
     "scipy>=1.10.0",

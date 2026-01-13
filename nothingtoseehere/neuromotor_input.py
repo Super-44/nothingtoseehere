@@ -1384,6 +1384,153 @@ class NeuromotorMouse:
             
             # Variable delay between scroll events
             await asyncio.sleep(random.uniform(0.03, 0.15))
+    
+    async def hover(
+        self,
+        x: int,
+        y: int,
+        target_width: float = 50.0,
+        target_height: Optional[float] = None
+    ) -> None:
+        """
+        Move to target without clicking (hover).
+        
+        Args:
+            x, y: Target coordinates
+            target_width: Width of target area (for Fitts' Law timing)
+            target_height: Height of target (defaults to width)
+        """
+        await self.move_to(x, y, target_width, target_height, click=False)
+    
+    async def double_click(
+        self,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        target_width: float = 50.0
+    ) -> None:
+        """
+        Double-click at position (or current position if not specified).
+        
+        Args:
+            x, y: Optional target coordinates
+            target_width: Width of target for movement timing
+        """
+        if x is not None and y is not None:
+            await self.move_to(x, y, target_width=target_width, click=False)
+        await self.click(clicks=2)
+    
+    async def right_click(
+        self,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        target_width: float = 50.0
+    ) -> None:
+        """
+        Right-click at position (or current position if not specified).
+        
+        Args:
+            x, y: Optional target coordinates
+            target_width: Width of target for movement timing
+        """
+        if x is not None and y is not None:
+            await self.move_to(x, y, target_width=target_width, click=False)
+        await self.click(button='right')
+    
+    async def triple_click(
+        self,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        target_width: float = 50.0
+    ) -> None:
+        """
+        Triple-click at position (select paragraph/line).
+        
+        Args:
+            x, y: Optional target coordinates
+            target_width: Width of target for movement timing
+        """
+        if x is not None and y is not None:
+            await self.move_to(x, y, target_width=target_width, click=False)
+        await self.click(clicks=3)
+    
+    async def move_relative(
+        self,
+        dx: int,
+        dy: int,
+        target_width: float = 50.0
+    ) -> None:
+        """
+        Move cursor by relative offset from current position.
+        
+        Args:
+            dx, dy: Relative movement in pixels
+            target_width: Assumed target width for timing
+        """
+        current = pyautogui.position()
+        await self.move_to(
+            int(current[0] + dx),
+            int(current[1] + dy),
+            target_width=target_width,
+            click=False
+        )
+    
+    async def drag_to(
+        self,
+        x: int,
+        y: int,
+        target_width: float = 50.0,
+        target_height: Optional[float] = None,
+        button: str = 'left'
+    ) -> None:
+        """
+        Drag from current position to target with human-like movement.
+        
+        Holds mouse button down, moves with natural kinematics,
+        then releases at destination.
+        
+        Args:
+            x, y: Target coordinates
+            target_width: Width of drop target
+            target_height: Height of drop target (defaults to width)
+            button: Mouse button to hold during drag
+        """
+        if target_height is None:
+            target_height = target_width
+        
+        # Small pause before starting drag
+        await asyncio.sleep(random.uniform(0.05, 0.15))
+        
+        # Press and hold
+        pyautogui.mouseDown(button=button)
+        await asyncio.sleep(random.uniform(0.02, 0.08))
+        
+        # Move to target (drag movements are typically slower/more careful)
+        start = pyautogui.position()
+        endpoint = self._calculate_endpoint((x, y), target_width, target_height)
+        
+        distance = math.sqrt(
+            (endpoint[0] - start[0])**2 + (endpoint[1] - start[1])**2
+        )
+        
+        if distance > 3:
+            # Drag movements take longer (more careful)
+            total_duration = self.fitts.movement_time(
+                distance, min(target_width, target_height)
+            ) * 1.3  # 30% slower for drags
+            
+            # Single smooth movement for drag (no submovements)
+            await self._execute_submovement(
+                (float(start[0]), float(start[1])),
+                endpoint,
+                total_duration
+            )
+        
+        # Small pause before release
+        await asyncio.sleep(random.uniform(0.05, 0.15))
+        
+        # Release
+        pyautogui.mouseUp(button=button)
+        self._last_position = (int(endpoint[0]), int(endpoint[1]))
 
 
 class NeuromotorKeyboard:
@@ -1518,6 +1665,83 @@ class NeuromotorInput:
             click=True,
             button=button
         )
+    
+    async def click_nodriver_element(
+        self,
+        element,
+        page,
+        button: str = 'left',
+        chrome_height: int = 85
+    ) -> None:
+        """
+        Click a nodriver element with human-like movement.
+        
+        Automatically converts element position to screen coordinates.
+        
+        Args:
+            element: nodriver Element object
+            page: nodriver Page object (for window position)
+            button: Mouse button to click
+            chrome_height: Browser chrome height in pixels (default 85)
+        
+        Example:
+            button = await page.select('button.submit')
+            await human.click_nodriver_element(button, page)
+        """
+        # Get element position within page
+        box = await element.get_position()
+        
+        # Get window bounds - nodriver returns (WindowID, Bounds) tuple
+        _, bounds = await page.get_window()
+        
+        # Convert to screen coordinates
+        screen_x = int(bounds.left + box.x)
+        screen_y = int(bounds.top + chrome_height + box.y)
+        
+        await self.mouse.move_to(
+            screen_x + int(box.width) // 2,
+            screen_y + int(box.height) // 2,
+            target_width=box.width,
+            target_height=box.height,
+            click=True,
+            button=button
+        )
+    
+    async def fill_nodriver_input(
+        self,
+        element,
+        page,
+        text: str,
+        clear_first: bool = True,
+        chrome_height: int = 85
+    ) -> None:
+        """
+        Click a nodriver input element and type text.
+        
+        Args:
+            element: nodriver Element object (input/textarea)
+            page: nodriver Page object
+            text: Text to type
+            clear_first: Whether to clear existing text first
+            chrome_height: Browser chrome height in pixels
+        
+        Example:
+            search_box = await page.select('input[name="q"]')
+            await human.fill_nodriver_input(search_box, page, "search query")
+        """
+        # Click to focus
+        await self.click_nodriver_element(element, page, chrome_height=chrome_height)
+        
+        # Reaction time before typing
+        await asyncio.sleep(self.reaction.sample())
+        
+        if clear_first:
+            await self.keyboard.hotkey(MODIFIER_KEY, 'a')
+            await asyncio.sleep(random.uniform(0.1, 0.2))
+            await self.keyboard.press_key('backspace')
+            await asyncio.sleep(random.uniform(0.1, 0.2))
+        
+        await self.keyboard.type_text(text)
     
     async def fill_input(
         self,

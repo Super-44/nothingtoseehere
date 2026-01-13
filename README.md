@@ -48,6 +48,47 @@ async def main():
 asyncio.run(main())
 ```
 
+## API Overview
+
+### Mouse Methods
+```python
+await human.mouse.move_to(x, y, target_width=50, click=True)
+await human.mouse.hover(x, y)           # Move without clicking
+await human.mouse.click()               # Click at current position
+await human.mouse.double_click(x, y)    # Double-click
+await human.mouse.right_click(x, y)     # Right-click
+await human.mouse.triple_click(x, y)    # Select paragraph
+await human.mouse.drag_to(x, y)         # Drag and drop
+await human.mouse.scroll(-5)            # Scroll down
+await human.mouse.move_relative(dx, dy) # Move by offset
+```
+
+### Keyboard Methods
+```python
+await human.keyboard.type_text("Hello!", with_typos=True)
+await human.keyboard.press_key("enter")
+await human.keyboard.hotkey("ctrl", "c")  # Or "command" on macOS
+```
+
+### nodriver Integration
+```python
+import nodriver as uc
+from nothingtoseehere import NeuromotorInput
+
+async def main():
+    human = NeuromotorInput()
+    browser = await uc.start()
+    page = await browser.get("https://example.com")
+    
+    # Click elements directly - no manual coordinate conversion!
+    button = await page.select("button.submit")
+    await human.click_nodriver_element(button, page)
+    
+    # Fill input fields
+    search = await page.select("input[name='q']")
+    await human.fill_nodriver_input(search, page, "search query")
+```
+
 ## Demos
 
 Try the interactive demos:
@@ -64,6 +105,29 @@ python examples/wikipedia_demo.py
 
 See [nothingtoseehere/README.md](nothingtoseehere/README.md) for detailed documentation on the neuromotor models and configuration options.
 
+## Future Improvements
+
+The following features are planned for future releases:
+
+### Persona Presets
+Pre-configured profiles for different user types:
+```python
+# Coming soon!
+human = NeuromotorInput.gamer()     # Fast reactions, high precision
+human = NeuromotorInput.elderly()   # Slower, more careful movements
+human = NeuromotorInput.mobile()    # Touch-screen patterns
+human = NeuromotorInput.novice()    # Hesitant, meandering paths
+```
+
+### Device Profiles
+- Trackpad simulation (different movement patterns)
+- Touch screen gestures
+- Gaming mouse profiles
+
+### Recording & Replay
+- Record real human movements for analysis
+- Replay recorded patterns with variation
+
 ## Development
 
 To contribute to this library, first checkout the code. Then create a new virtual environment:
@@ -74,9 +138,13 @@ source venv/bin/activate
 ```
 Now install the dependencies and test dependencies:
 ```bash
-python -m pip install -e '.[test]'
+pip install -e ".[dev]"
 ```
 To run the tests:
 ```bash
 python -m pytest
 ```
+
+## License
+
+Apache 2.0 - See [LICENSE](LICENSE) for details.
