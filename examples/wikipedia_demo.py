@@ -3,10 +3,19 @@
 Wikipedia Demo - Human-like Browser Automation
 
 Demonstrates the nothingtoseehere library by:
-1. Opening Wikipedia in a visible browser
-2. Moving the mouse with human-like kinematics
-3. Clicking links and typing in search
-4. All movements follow neuromotor research patterns
+1. Clicking on "Random article" with accurate targeting
+2. Searching for "Fitts's law" with human-like typing and typos
+3. Scrolling the page with variable timing
+4. Clicking multiple article links with natural movement
+5. Toggling dark mode (UI element interaction)
+6. Typing custom username "Super44" with triple-click clearing
+
+Features showcased:
+- Human-like mouse kinematics (curved paths, asymmetric velocity)
+- Auto-detected browser chrome height
+- Triple-click for targeted input clearing (not global Cmd+A)
+- Realistic typing with typos and corrections
+- All movements follow neuromotor research patterns
 
 Run with: python examples/wikipedia_demo.py
 """
@@ -29,7 +38,15 @@ async def main():
     print("=" * 60)
     print("\nThis demo shows human-like mouse movements and interactions.")
     print("Watch how the cursor moves with natural acceleration,")
-    print("curvature, and tremor - not in straight robotic lines!\n")
+    print("curvature, and tremor - not in straight robotic lines!")
+    print("\nDemos included:")
+    print("  1. 🎲 Random article click")
+    print("  2. 🔍 Search with typing & typos")
+    print("  3. 📜 Scrolling with variable timing")
+    print("  4. 🔗 Multiple link clicks")
+    print("  5. 🌙 Dark mode toggle")
+    print("  6. 👤 Custom username search (Super44)")
+    print()
     
     # Use realistic human-like defaults
     config = NeuromotorConfig(
@@ -189,6 +206,93 @@ async def main():
         print(f"   Link clicking failed: {e}")
     
     # =========================================================================
+    # Demo 5: Toggle dark mode
+    # =========================================================================
+    print("\n🌙 Demo 5: Toggling dark mode...")
+    
+    try:
+        # Navigate to main page first
+        await page.get('https://en.wikipedia.org')
+        await asyncio.sleep(2)
+        
+        # Look for the appearance/theme toggle button
+        # Wikipedia's theme toggle can be in different places depending on login state
+        # Try common selectors
+        theme_selectors = [
+            'button[title*="appearance"]',
+            'button[title*="theme"]',
+            'a[title*="appearance"]',
+            '#vector-appearance-dropdown-checkbox',
+            '.vector-appearance-landmark button',
+        ]
+        
+        theme_button = None
+        for selector in theme_selectors:
+            try:
+                theme_button = await page.select(selector, timeout=1)
+                if theme_button:
+                    break
+            except Exception:
+                continue
+        
+        if theme_button:
+            print("   Found theme toggle button, clicking...")
+            await human.click_nodriver_element(theme_button, page)
+            await asyncio.sleep(0.5)
+            
+            # Try to click on dark mode option if menu appeared
+            try:
+                dark_mode_option = await page.select('input[value="night"], button:has-text("Dark")', timeout=1)
+                if dark_mode_option:
+                    print("   Clicking dark mode option...")
+                    await human.click_nodriver_element(dark_mode_option, page)
+                    await asyncio.sleep(1)
+                    print("   ✓ Dark mode toggled!")
+            except Exception:
+                print("   ✓ Theme menu opened!")
+        else:
+            print("   Theme toggle not found (may vary by Wikipedia version)")
+            
+    except Exception as e:
+        print(f"   Theme toggle demo skipped: {e}")
+    
+    # =========================================================================
+    # Demo 6: Search with custom username
+    # =========================================================================
+    print("\n👤 Demo 6: Searching for 'Super44'...")
+    
+    try:
+        # Navigate to main page to ensure we have a fresh search box
+        await page.get('https://en.wikipedia.org')
+        await asyncio.sleep(2)
+        
+        # Find search input
+        search_input = await page.select('input[name="search"]')
+        if search_input:
+            username = "Super44"
+            print(f"   Typing username: '{username}'")
+            print("   (Watch the triple-click clear and realistic typing!)")
+            
+            # Use the improved fill method with triple-click clearing
+            await human.fill_nodriver_input(
+                search_input, 
+                page, 
+                username,
+                clear_first=True,  # Uses triple-click now!
+                with_typos=False   # Keep it clean for username
+            )
+            
+            await asyncio.sleep(0.5)
+            
+            # Press Enter to search
+            await human.keyboard.press_key('enter')
+            print("   ✓ Search submitted!")
+            await asyncio.sleep(2)
+            
+    except Exception as e:
+        print(f"   Username search demo failed: {e}")
+    
+    # =========================================================================
     # Finish
     # =========================================================================
     print("\n" + "=" * 60)
@@ -200,6 +304,8 @@ async def main():
     print("  • Small tremor/jitter throughout (8-12 Hz)")
     print("  • Click targeting had slight variance (bivariate normal)")
     print("  • Typing had variable inter-key timing")
+    print("  • Triple-click for targeted input clearing (not global Cmd+A)")
+    print("  • Chrome height auto-detected for accurate clicking")
     print("\nThese patterns match human neuromotor behavior and help")
     print("evade behavioral biometric detection systems.\n")
     
