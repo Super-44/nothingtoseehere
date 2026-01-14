@@ -23,28 +23,6 @@ import nodriver as uc
 from nothingtoseehere import NeuromotorInput, NeuromotorConfig, FittsParams
 
 
-async def get_element_screen_position(element, page) -> tuple[int, int, int, int]:
-    """
-    Get an element's position in screen coordinates.
-    
-    Returns (x, y, width, height) where x,y is top-left corner in screen coords.
-    """
-    # Get element's position within the page
-    box = await element.get_position()
-    
-    # Get the browser window position
-    # nodriver returns (WindowID, Bounds) tuple where Bounds has .left, .top, etc.
-    _, bounds = await page.get_window()
-    
-    # Account for browser chrome (toolbar, etc.) - approximately 85px on most browsers
-    chrome_height = 85
-    
-    screen_x = int(bounds.left + box.x)
-    screen_y = int(bounds.top + chrome_height + box.y)
-    
-    return screen_x, screen_y, int(box.width), int(box.height)
-
-
 async def main():
     print("\n" + "=" * 60)
     print("🐭 NOTHINGTOSEEHERE - Wikipedia Demo")
@@ -88,20 +66,15 @@ async def main():
     # Demo 1: Click on "Random article" link
     # =========================================================================
     print("🎲 Demo 1: Clicking 'Random article' link...")
+    print("   (Chrome height auto-detected via JavaScript)")
     
     try:
         random_link = await page.select('a[title="Load a random article [Alt+Shift+x]"]')
         if random_link:
-            x, y, w, h = await get_element_screen_position(random_link, page)
-            print(f"   Target: ({x}, {y}) size: {w}x{h}")
-            
-            await human.mouse.move_to(
-                x + w // 2, 
-                y + h // 2,
-                target_width=w,
-                target_height=h,
-                click=True
-            )
+            print(f"   Found random article link, clicking...")
+            # Note: chrome_height is auto-detected by default
+            # For maximum reliability, you can use: use_cdp_click=True
+            await human.click_nodriver_element(random_link, page)
             print("   ✓ Clicked!")
             await asyncio.sleep(3)
     except Exception as e:
@@ -119,23 +92,16 @@ async def main():
         # Find search input
         search_input = await page.select('input[name="search"]')
         if search_input:
-            x, y, w, h = await get_element_screen_position(search_input, page)
-            print(f"   Search box at: ({x}, {y})")
-            
-            # Move to search box and click
-            await human.mouse.move_to(
-                x + w // 2,
-                y + h // 2, 
-                target_width=w,
-                target_height=h,
-                click=True
-            )
-            await asyncio.sleep(0.5)
-            
             # Type a search term with human-like timing (including possible typos!)
             search_term = "Fitts's law"  # Meta! Searching for the law we're implementing
             print(f"   Typing: '{search_term}' (with realistic typos enabled)")
-            await human.keyboard.type_text(search_term, with_typos=True)
+            print("   (Using triple-click to clear - more targeted than Cmd+A)")
+            
+            # Use the built-in fill method that handles:
+            # - Click to focus
+            # - Triple-click to select all (targeted, not global Cmd+A)
+            # - Type with human-like timing and typos
+            await human.fill_nodriver_input(search_input, page, search_term, with_typos=True)
             
             await asyncio.sleep(1)
             
@@ -195,23 +161,18 @@ async def main():
                 link = random.choice(links[:20])
                 
                 try:
-                    x, y, w, h = await get_element_screen_position(link, page)
+                    # Get element info to check if it's valid
+                    box = await link.get_position()
                     
-                    # Skip if element is too small or off-screen
-                    if w < 10 or h < 10 or y < 100 or y > 800:
+                    # Skip if element is too small or likely off-screen
+                    if box.width < 10 or box.height < 10 or box.y < 0 or box.y > 700:
                         continue
                     
                     link_text = await link.get_property('innerText')
                     link_text = link_text[:30] + "..." if len(link_text) > 30 else link_text
                     print(f"   Clicking: '{link_text}'")
                     
-                    await human.mouse.move_to(
-                        x + w // 2,
-                        y + h // 2,
-                        target_width=max(w, 20),
-                        target_height=max(h, 15),
-                        click=True
-                    )
+                    await human.click_nodriver_element(link, page)
                     
                     await asyncio.sleep(2)
                     

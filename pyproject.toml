@@ -5,7 +5,7 @@ description = "Human-like mouse and keyboard input simulation based on neuromoto
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "Super44"}]
-license = "Apache-2.0"
+license = {text = "Apache-2.0"}
 keywords = ["mouse", "keyboard", "automation", "human-like", "bot-detection", "neuromotor", "fitts-law"]
 classifiers = [
     "Development Status :: 3 - Alpha",

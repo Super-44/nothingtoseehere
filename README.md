@@ -81,10 +81,14 @@ async def main():
     page = await browser.get("https://example.com")
     
     # Click elements directly - no manual coordinate conversion!
+    # Chrome height is auto-detected via JavaScript
     button = await page.select("button.submit")
     await human.click_nodriver_element(button, page)
     
-    # Fill input fields
+    # For maximum reliability in complex scenarios, use CDP click
+    await human.click_nodriver_element(button, page, use_cdp_click=True)
+    
+    # Fill input fields (uses triple-click for targeted selection)
     search = await page.select("input[name='q']")
     await human.fill_nodriver_input(search, page, "search query")
 ```

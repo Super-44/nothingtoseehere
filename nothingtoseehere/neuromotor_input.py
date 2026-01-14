@@ -1695,7 +1695,7 @@ class NeuromotorInput:
         self,
         element: Any,
         page: Any,
-        chrome_height: int = 85
+        chrome_height: Optional[int] = None
     ) -> Tuple[int, int, int, int]:
         """
         Convert nodriver element to screen coordinates.
@@ -1703,11 +1703,12 @@ class NeuromotorInput:
         Args:
             element: nodriver Element object
             page: nodriver Page object
-            chrome_height: Browser chrome/toolbar height (varies by browser/OS,
-                          typically 85px for Chrome, 75px for Firefox)
+            chrome_height: Browser chrome/toolbar height in pixels. If None (default),
+                          auto-detects using JavaScript to measure window.outerHeight - window.innerHeight.
+                          Falls back to 0 for headless/container environments.
         
         Returns:
-            (center_x, center_y, width, height) in screen coordinates
+            (x, y, width, height) where x,y is the top-left corner in screen coordinates
         """
         # Get element position within page
         box = await element.get_position()
@@ -1715,9 +1716,20 @@ class NeuromotorInput:
         # Get window bounds - nodriver returns (WindowID, Bounds) tuple
         _, bounds = await page.get_window()
         
-        # Convert to screen coordinates
-        screen_x = int(bounds.left + box.x + box.width / 2)
-        screen_y = int(bounds.top + chrome_height + box.y + box.height / 2)
+        # Auto-detect chrome height if not provided
+        if chrome_height is None:
+            try:
+                # Use JavaScript to get accurate chrome height
+                # This works across different browsers and OS configurations
+                result = await page.evaluate("window.outerHeight - window.innerHeight")
+                chrome_height = int(result) if result else 0
+            except Exception:
+                # Fallback for headless/container environments where chrome may not exist
+                chrome_height = 0
+        
+        # Convert to screen coordinates (top-left corner)
+        screen_x = int(bounds.left + box.x)
+        screen_y = int(bounds.top + chrome_height + box.y)
         
         return screen_x, screen_y, int(box.width), int(box.height)
     
@@ -1726,7 +1738,8 @@ class NeuromotorInput:
         element: Any,
         page: Any,
         button: ButtonType = 'left',
-        chrome_height: int = 85
+        chrome_height: Optional[int] = None,
+        use_cdp_click: bool = False
     ) -> None:
         """
         Click a nodriver element with human-like movement.
@@ -1737,24 +1750,39 @@ class NeuromotorInput:
             element: nodriver Element object
             page: nodriver Page object (for window position)
             button: Mouse button to click
-            chrome_height: Browser chrome height in pixels (default 85,
-                          may need adjustment for different browsers)
+            chrome_height: Browser chrome height in pixels. If None (default),
+                          auto-detects using JavaScript. Set to 0 for headless.
+            use_cdp_click: If True, uses CDP (Chrome DevTools Protocol) click for
+                          maximum reliability instead of pyautogui coordinate-based click.
+                          The mouse still moves naturally for visual effect.
         
         Example:
             button = await page.select('button.submit')
             await human.click_nodriver_element(button, page)
+            
+            # For maximum reliability in complex scenarios:
+            await human.click_nodriver_element(button, page, use_cdp_click=True)
         """
         x, y, width, height = await self._get_nodriver_screen_coords(
             element, page, chrome_height
         )
         
+        # Calculate center of element (coords are top-left)
+        center_x = x + width // 2
+        center_y = y + height // 2
+        
+        # Move mouse naturally for visual effect
         await self.mouse.move_to(
-            x, y,
+            center_x, center_y,
             target_width=width,
             target_height=height,
-            click=True,
+            click=not use_cdp_click,  # Only click via pyautogui if not using CDP
             button=button
         )
+        
+        # Use CDP click for reliability if requested
+        if use_cdp_click:
+            await element.click()
     
     async def fill_nodriver_input(
         self,
@@ -1762,7 +1790,7 @@ class NeuromotorInput:
         page: Any,
         text: str,
         clear_first: bool = True,
-        chrome_height: int = 85,
+        chrome_height: Optional[int] = None,
         with_typos: bool = True
     ) -> None:
         """
@@ -1772,8 +1800,10 @@ class NeuromotorInput:
             element: nodriver Element object (input/textarea)
             page: nodriver Page object
             text: Text to type
-            clear_first: Whether to clear existing text first
-            chrome_height: Browser chrome height in pixels
+            clear_first: Whether to clear existing text first (uses triple-click
+                        to select all text in the specific element, not globally)
+            chrome_height: Browser chrome height in pixels. If None (default),
+                          auto-detects using JavaScript.
             with_typos: Whether to simulate occasional typos
         
         Example:
@@ -1787,8 +1817,20 @@ class NeuromotorInput:
         await asyncio.sleep(self.reaction.sample())
         
         if clear_first:
-            await self.keyboard.hotkey(MODIFIER_KEY, 'a')
+            # Use triple-click to select all text in THIS element (not global Cmd+A)
+            # This is more targeted and won't accidentally select other content
+            await asyncio.sleep(random.uniform(0.05, 0.1))
+            
+            # Triple-click with realistic timing
+            await self.mouse.click()
+            await asyncio.sleep(random.uniform(0.08, 0.15))
+            await self.mouse.click()
+            await asyncio.sleep(random.uniform(0.08, 0.15))
+            await self.mouse.click()  # Triple-click = select all in input
+            
             await asyncio.sleep(random.uniform(0.1, 0.2))
+            
+            # Type will replace selected text, or backspace if needed
             await self.keyboard.press_key('backspace')
             await asyncio.sleep(random.uniform(0.1, 0.2))
         
