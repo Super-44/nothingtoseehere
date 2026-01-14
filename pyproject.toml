@@ -1,6 +1,6 @@
 [project]
 name = "nothingtoseehere"
-version = "1.0.0"
+version = "1.1.0"
 description = "Human-like mouse and keyboard input simulation based on neuromotor research. Nothing to see here. 🐭"
 readme = "README.md"
 requires-python = ">=3.10"

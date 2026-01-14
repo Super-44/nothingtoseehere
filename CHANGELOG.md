@@ -5,6 +5,52 @@ All notable changes to nothingtoseehere will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-01-14
+
+### Fixed
+- **Critical: Fixed coordinate calculation bug in nodriver integration** 🐛
+  - `_get_nodriver_screen_coords()` was double-centering coordinates, causing clicks to be offset by half the element's dimensions
+  - Elements are now clicked accurately at their true center position
+  - This was causing the "select all" issue - wrong elements were being clicked!
+
+### Added
+- **Auto-detection of browser chrome height** 🎯
+  - `chrome_height` parameter now optional (defaults to `None`)
+  - Automatically detects chrome height using JavaScript: `window.outerHeight - window.innerHeight`
+  - Works across all browsers (Chrome, Firefox, Edge, Safari) and operating systems
+  - Falls back to 0 for headless/container environments
+  - No more manual configuration needed!
+
+- **CDP click fallback option** 🔧
+  - Added `use_cdp_click` parameter to `click_nodriver_element()`
+  - When enabled, uses Chrome DevTools Protocol for maximum reliability
+  - Mouse still moves naturally for visual effect
+  - Perfect for: iframes, shadow DOM, overlapping elements
+
+### Changed
+- **Improved input clearing with triple-click** 🖱️
+  - `fill_nodriver_input()` now uses triple-click instead of global `Cmd+A` / `Ctrl+A`
+  - More human-like interaction pattern
+  - Only affects the focused element (not the entire page!)
+  - Safer when coordinates are slightly off
+  - Uses realistic timing between clicks (80-150ms)
+
+- **Updated Wikipedia demo** 📖
+  - Added Demo 5: Dark mode toggle
+  - Added Demo 6: Custom username search ("Super44")
+  - Showcases all new features
+  - Updated documentation strings
+
+### Documentation
+- Added `IMPROVEMENTS_SUMMARY.md` with detailed explanation of all changes
+- Updated README.md with new API examples
+- Enhanced example comments to highlight new features
+
+### Compatibility
+- ✅ **100% backward compatible** - all existing code works without changes
+- All parameters are optional with sensible defaults
+- No breaking changes to existing APIs
+
 ## [1.0.0] - 2026-01-13
 
 ### Added
