@@ -1145,6 +1145,30 @@ class NeuromotorConfig:
     
     # Debug mode (slower, more visible)
     debug_mode: bool = False
+    
+    # Automatic post-action delays
+    # NOTE: Neuromotor research focuses on PRE-action delays (verification dwell,
+    # reaction time), which are already built into the library. Post-action delays
+    # are less well-studied but represent cognitive processing between actions.
+    # Set auto_delays=False to disable entirely for manual control.
+    auto_delays: bool = True
+    
+    # Post-click: Minimal visual feedback acknowledgment
+    # Research basis: Visual feedback latency ~50-100ms, but context-dependent
+    # (clicking a button vs link vs checkbox have different cognitive requirements)
+    # User should add explicit delays for page loads/animations
+    post_click_delay: Tuple[float, float] = (0.05, 0.12)  # (min, max) seconds
+    
+    # Post-type: Brief pause after typing (cursor repositioning, eye movement)
+    # Research basis: Limited - inferred from inter-keystroke intervals
+    # User should add explicit delays before form submission
+    post_type_delay: Tuple[float, float] = (0.05, 0.12)
+    
+    # Post-scroll: Reorientation + visual search for next target
+    # Research basis: Visual search time 200-500ms (well-documented in HCI)
+    # Saccade planning ~200ms, target acquisition ~200-400ms
+    # This is the most justified automatic delay
+    post_scroll_delay: Tuple[float, float] = (0.15, 0.4)
 
 
 class NeuromotorMouse:
@@ -1352,6 +1376,11 @@ class NeuromotorMouse:
         pyautogui.mouseDown(button=button)
         await asyncio.sleep(duration)
         pyautogui.mouseUp(button=button)
+        
+        # Post-click processing delay (automatic)
+        if self.config.auto_delays:
+            delay = random.uniform(*self.config.post_click_delay)
+            await asyncio.sleep(delay)
     
     async def click(
         self,
@@ -1409,6 +1438,11 @@ class NeuromotorMouse:
             
             # Variable delay between scroll events
             await asyncio.sleep(random.uniform(0.03, 0.15))
+        
+        # Post-scroll processing delay (automatic)
+        if self.config.auto_delays:
+            delay = random.uniform(*self.config.post_scroll_delay)
+            await asyncio.sleep(delay)
     
     async def hover(
         self,
@@ -1563,9 +1597,16 @@ class NeuromotorKeyboard:
     Human-like keyboard input with realistic timing.
     """
     
-    def __init__(self, config: Optional[KeyboardTimingParams] = None):
+    def __init__(
+        self, 
+        config: Optional[KeyboardTimingParams] = None,
+        auto_delays: bool = True,
+        post_type_delay: Tuple[float, float] = (0.2, 0.5)
+    ):
         self.model = KeyboardModel(config)
         self._last_char = ''
+        self.auto_delays = auto_delays
+        self.post_type_delay = post_type_delay
     
     async def type_text(
         self,
@@ -1612,6 +1653,11 @@ class NeuromotorKeyboard:
             
             self._last_char = char
             i += 1
+        
+        # Post-typing processing delay (automatic)
+        if self.auto_delays:
+            delay = random.uniform(*self.post_type_delay)
+            await asyncio.sleep(delay)
     
     async def _press_key(self, key: str) -> None:
         """Press a key with realistic hold duration."""
@@ -1661,8 +1707,13 @@ class NeuromotorInput:
         mouse_config: Optional[NeuromotorConfig] = None,
         keyboard_config: Optional[KeyboardTimingParams] = None
     ):
-        self.mouse = NeuromotorMouse(mouse_config)
-        self.keyboard = NeuromotorKeyboard(keyboard_config)
+        self.config = mouse_config or NeuromotorConfig()
+        self.mouse = NeuromotorMouse(self.config)
+        self.keyboard = NeuromotorKeyboard(
+            keyboard_config,
+            auto_delays=self.config.auto_delays,
+            post_type_delay=self.config.post_type_delay
+        )
         self.reaction = ReactionTimeModel()
     
     async def click_element(
@@ -1710,9 +1761,6 @@ class NeuromotorInput:
         Returns:
             (x, y, width, height) where x,y is the top-left corner in screen coordinates
         """
-        # Get element position within page
-        box = await element.get_position()
-        
         # Get window bounds - nodriver returns (WindowID, Bounds) tuple
         _, bounds = await page.get_window()
         
@@ -1727,11 +1775,34 @@ class NeuromotorInput:
                 # Fallback for headless/container environments where chrome may not exist
                 chrome_height = 0
         
-        # Convert to screen coordinates (top-left corner)
-        screen_x = int(bounds.left + box.x)
-        screen_y = int(bounds.top + chrome_height + box.y)
-        
-        return screen_x, screen_y, int(box.width), int(box.height)
+        # Use getBoundingClientRect() to get viewport-relative coordinates
+        # This accounts for scroll position automatically
+        try:
+            rect = await page.evaluate("""
+                (element) => {
+                    const rect = element.getBoundingClientRect();
+                    return {
+                        x: rect.left,
+                        y: rect.top,
+                        width: rect.width,
+                        height: rect.height
+                    };
+                }
+            """, element)
+            
+            # Convert viewport coordinates to screen coordinates
+            screen_x = int(bounds.left + rect['x'])
+            screen_y = int(bounds.top + chrome_height + rect['y'])
+            
+            return screen_x, screen_y, int(rect['width']), int(rect['height'])
+            
+        except Exception:
+            # Fallback to element.get_position() if JavaScript fails
+            # Note: This may not account for scroll position correctly
+            box = await element.get_position()
+            screen_x = int(bounds.left + box.x)
+            screen_y = int(bounds.top + chrome_height + box.y)
+            return screen_x, screen_y, int(box.width), int(box.height)
     
     async def click_nodriver_element(
         self,
@@ -1739,12 +1810,14 @@ class NeuromotorInput:
         page: Any,
         button: ButtonType = 'left',
         chrome_height: Optional[int] = None,
-        use_cdp_click: bool = False
+        use_cdp_click: bool = False,
+        scroll_into_view: bool = True
     ) -> None:
         """
         Click a nodriver element with human-like movement.
         
-        Automatically converts element position to screen coordinates.
+        Automatically converts element position to screen coordinates and optionally
+        scrolls the element into view if it's not visible.
         
         Args:
             element: nodriver Element object
@@ -1755,6 +1828,8 @@ class NeuromotorInput:
             use_cdp_click: If True, uses CDP (Chrome DevTools Protocol) click for
                           maximum reliability instead of pyautogui coordinate-based click.
                           The mouse still moves naturally for visual effect.
+            scroll_into_view: If True (default), automatically scrolls element into
+                            view if it's not visible in the viewport.
         
         Example:
             button = await page.select('button.submit')
@@ -1763,6 +1838,23 @@ class NeuromotorInput:
             # For maximum reliability in complex scenarios:
             await human.click_nodriver_element(button, page, use_cdp_click=True)
         """
+        # Scroll element into view if needed
+        if scroll_into_view:
+            try:
+                await page.evaluate("""
+                    (element) => {
+                        element.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center',
+                            inline: 'center'
+                        });
+                    }
+                """, element)
+                # Wait for smooth scroll to complete
+                await asyncio.sleep(random.uniform(0.3, 0.6))
+            except Exception:
+                pass  # Continue even if scroll fails
+        
         x, y, width, height = await self._get_nodriver_screen_coords(
             element, page, chrome_height
         )
@@ -1791,7 +1883,8 @@ class NeuromotorInput:
         text: str,
         clear_first: bool = True,
         chrome_height: Optional[int] = None,
-        with_typos: bool = True
+        with_typos: bool = True,
+        scroll_into_view: bool = True
     ) -> None:
         """
         Click a nodriver input element and type text.
@@ -1805,13 +1898,19 @@ class NeuromotorInput:
             chrome_height: Browser chrome height in pixels. If None (default),
                           auto-detects using JavaScript.
             with_typos: Whether to simulate occasional typos
+            scroll_into_view: If True (default), automatically scrolls element into
+                            view if it's not visible in the viewport.
         
         Example:
             search_box = await page.select('input[name="q"]')
             await human.fill_nodriver_input(search_box, page, "search query")
         """
-        # Click to focus
-        await self.click_nodriver_element(element, page, chrome_height=chrome_height)
+        # Click to focus (with auto-scroll)
+        await self.click_nodriver_element(
+            element, page, 
+            chrome_height=chrome_height,
+            scroll_into_view=scroll_into_view
+        )
         
         # Reaction time before typing
         await asyncio.sleep(self.reaction.sample())
@@ -1871,13 +1970,101 @@ class NeuromotorInput:
         min_seconds: float = 0.5,
         max_seconds: float = 2.0
     ) -> None:
-        """Add a human-like pause (e.g., reading, thinking)."""
+        """
+        Add a human-like pause (e.g., reading, thinking, general delay).
+        
+        Use this for context-specific delays like:
+        - Reading content before next action
+        - Pausing to think/decide
+        - General human-like pauses
+        
+        Note: For page loads, use wait_for_page() instead.
+        
+        Args:
+            min_seconds: Minimum wait time
+            max_seconds: Maximum wait time
+        
+        Example:
+            await human.mouse.click()
+            await human.wait_human(0.5, 1.5)  # Brief pause to think
+        """
         duration = Distributions.log_normal(
             math.log((min_seconds + max_seconds) / 2 * 1000),
             0.3
         ) / 1000
         duration = np.clip(duration, min_seconds, max_seconds * 1.5)
         await asyncio.sleep(duration)
+    
+    async def wait_for_page(
+        self,
+        page: Any,
+        min_read_time: float = 0.3,
+        max_read_time: float = 1.0,
+        timeout: float = 10.0
+    ) -> None:
+        """
+        Wait for page to fully load, then add human-like reading/orientation delay.
+        
+        This combines technical page load waiting with realistic human behavior:
+        1. Waits for page to be ready (network idle, DOM loaded)
+        2. Adds natural delay for reading/orienting to new content
+        
+        Args:
+            page: nodriver Page object
+            min_read_time: Minimum reading/orientation time after load (seconds)
+            max_read_time: Maximum reading/orientation time after load (seconds)
+            timeout: Maximum time to wait for page load (seconds)
+        
+        Example:
+            await human.keyboard.press_key('enter')  # Submit form
+            await human.wait_for_page(page)  # Wait for navigation + human delay
+            
+            # Or customize reading time:
+            await human.click_nodriver_element(link, page)
+            await human.wait_for_page(page, min_read_time=0.5, max_read_time=2.0)
+        """
+        try:
+            # Wait for page to be in a loaded state
+            # nodriver's page has methods to wait for various states
+            # We'll use a combination of checks with timeout
+            start_time = asyncio.get_event_loop().time()
+            
+            # Wait for the page to reach a stable state
+            # Try to wait for network idle (most reliable for SPAs)
+            try:
+                await asyncio.wait_for(
+                    page.wait(timeout / 1000),  # nodriver uses milliseconds
+                    timeout=timeout
+                )
+            except asyncio.TimeoutError:
+                # Page didn't fully load within timeout, continue anyway
+                pass
+            except AttributeError:
+                # If wait() doesn't exist or has different signature, use simpler approach
+                # Wait for document.readyState to be complete
+                try:
+                    end_time = start_time + timeout
+                    while asyncio.get_event_loop().time() < end_time:
+                        ready_state = await page.evaluate("document.readyState")
+                        if ready_state == "complete":
+                            break
+                        await asyncio.sleep(0.1)
+                except Exception:
+                    # Fallback: just wait a bit
+                    await asyncio.sleep(0.5)
+            
+        except Exception:
+            # If any page load detection fails, continue with just human delay
+            pass
+        
+        # Add human reading/orientation delay
+        # Research: Initial page scan ~300-1000ms, understanding content ~500-2000ms
+        read_delay = Distributions.log_normal(
+            math.log((min_read_time + max_read_time) / 2 * 1000),
+            0.3
+        ) / 1000
+        read_delay = np.clip(read_delay, min_read_time, max_read_time * 1.5)
+        await asyncio.sleep(read_delay)
 
 
 # =============================================================================

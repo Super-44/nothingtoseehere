@@ -280,27 +280,64 @@ print(f"Overall: {'PASS' if analysis['overall_valid'] else 'FAIL'}")
 
 ## Integration with Browser Automation
 
-### With nodriver
+### With nodriver (Recommended)
+
+The library includes helpers specifically for nodriver with automatic coordinate conversion and page load handling:
 
 ```python
 from nothingtoseehere import NeuromotorInput
 import nodriver as uc
 
-async def click_with_human_input(page, selector: str):
+async def automate_with_nodriver():
     human = NeuromotorInput()
+    browser = await uc.start()
+    page = await browser.get('https://example.com')
     
-    # Find element
-    element = await page.select(selector)
-    box = await element.get_position()
+    # Wait for page load + natural reading time
+    await human.wait_for_page(page)
     
-    # Click with human-like movement
-    await human.mouse.move_to(
-        int(box.x + box.width / 2),
-        int(box.y + box.height / 2),
-        target_width=box.width,
-        target_height=box.height,
-        click=True
+    # Click element (automatically converts coordinates and scrolls into view)
+    button = await page.select('button.submit')
+    await human.click_nodriver_element(button, page)
+    
+    # Wait for navigation
+    await human.wait_for_page(page, min_read_time=0.5, max_read_time=2.0)
+    
+    # Fill input with human-like typing
+    search_box = await page.select('input[name="q"]')
+    await human.fill_nodriver_input(
+        search_box, page, 
+        "search query",
+        with_typos=True  # Realistic typos with corrections
     )
+```
+
+#### Key nodriver Features:
+
+**Automatic coordinate conversion:**
+- Converts element positions to screen coordinates
+- Auto-detects browser chrome height
+- Accounts for viewport scroll position
+
+**Intelligent page load waiting:**
+```python
+# Wait for page ready + human reading/orientation time
+await human.wait_for_page(page)  # Default: 300-1000ms reading time
+
+# Customize reading time based on content
+await human.wait_for_page(page, min_read_time=0.5, max_read_time=2.0)
+```
+
+**Automatic scroll into view:**
+```python
+# Element automatically scrolls into viewport before clicking
+await human.click_nodriver_element(element, page, scroll_into_view=True)
+```
+
+**Triple-click input clearing:**
+```python
+# Uses triple-click to clear (more targeted than Cmd+A)
+await human.fill_nodriver_input(element, page, "text", clear_first=True)
 ```
 
 ### With Selenium

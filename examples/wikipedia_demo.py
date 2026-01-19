@@ -3,18 +3,18 @@
 Wikipedia Demo - Human-like Browser Automation
 
 Demonstrates the nothingtoseehere library by:
-1. Clicking on "Random article" with accurate targeting
-2. Searching for "Fitts's law" with human-like typing and typos
-3. Scrolling the page with variable timing
-4. Clicking multiple article links with natural movement
+1. Searching for "Fitts's law" with human-like typing and typos
+2. Scrolling the page with variable timing
+3. Clicking multiple article links with natural movement
+4. Searching again from article page for "Super44"
 5. Toggling dark mode (UI element interaction)
-6. Typing custom username "Super44" with triple-click clearing
 
 Features showcased:
 - Human-like mouse kinematics (curved paths, asymmetric velocity)
 - Auto-detected browser chrome height
 - Triple-click for targeted input clearing (not global Cmd+A)
 - Realistic typing with typos and corrections
+- Natural browsing flow without constant homepage returns
 - All movements follow neuromotor research patterns
 
 Run with: python examples/wikipedia_demo.py
@@ -29,7 +29,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import nodriver as uc
-from nothingtoseehere import NeuromotorInput, NeuromotorConfig, FittsParams
+from nothingtoseehere import NeuromotorInput, NeuromotorConfig, FittsParams, KeyboardTimingParams
 
 
 async def main():
@@ -40,12 +40,11 @@ async def main():
     print("Watch how the cursor moves with natural acceleration,")
     print("curvature, and tremor - not in straight robotic lines!")
     print("\nDemos included:")
-    print("  1. 🎲 Random article click")
-    print("  2. 🔍 Search with typing & typos")
-    print("  3. 📜 Scrolling with variable timing")
-    print("  4. 🔗 Multiple link clicks")
+    print("  1. 🔍 Search with typing & typos")
+    print("  2. 📜 Scrolling with variable timing")
+    print("  3. 🔗 Multiple link clicks")
+    print("  4. 👤 Second search from article (Super44)")
     print("  5. 🌙 Dark mode toggle")
-    print("  6. 👤 Custom username search (Super44)")
     print()
     
     # Use realistic human-like defaults
@@ -59,7 +58,12 @@ async def main():
         debug_mode=False,  # Set True for slower, more visible movements
     )
     
-    human = NeuromotorInput(mouse_config=config)
+    # Higher typo rate for demo visibility (default is 0.02 = 2%)
+    keyboard_config = KeyboardTimingParams(
+        typo_rate=0.15  # 15% chance for demo purposes - makes typos visible!
+    )
+    
+    human = NeuromotorInput(mouse_config=config, keyboard_config=keyboard_config)
     
     # Launch browser - visible, not headless
     print("📖 Opening browser and navigating to Wikipedia...")
@@ -73,37 +77,14 @@ async def main():
     
     # Get the page
     page = await browser.get('https://en.wikipedia.org')
-    
-    # Wait for page to load
-    await asyncio.sleep(2)
-    
+    await human.wait_for_page(page, min_read_time=0.5, max_read_time=1.0)
     print("✓ Wikipedia loaded!\n")
     
     # =========================================================================
-    # Demo 1: Click on "Random article" link
+    # Demo 1: Use search box
     # =========================================================================
-    print("🎲 Demo 1: Clicking 'Random article' link...")
+    print("🔍 Demo 1: Using the search box...")
     print("   (Chrome height auto-detected via JavaScript)")
-    
-    try:
-        random_link = await page.select('a[title="Load a random article [Alt+Shift+x]"]')
-        if random_link:
-            print(f"   Found random article link, clicking...")
-            # Note: chrome_height is auto-detected by default
-            # For maximum reliability, you can use: use_cdp_click=True
-            await human.click_nodriver_element(random_link, page)
-            print("   ✓ Clicked!")
-            await asyncio.sleep(3)
-    except Exception as e:
-        print(f"   Could not find random article link: {e}")
-    
-    # =========================================================================
-    # Demo 2: Go back to main page and use search
-    # =========================================================================
-    print("\n🔍 Demo 2: Using the search box...")
-    
-    await page.get('https://en.wikipedia.org')
-    await asyncio.sleep(2)
     
     try:
         # Find search input
@@ -120,20 +101,20 @@ async def main():
             # - Type with human-like timing and typos
             await human.fill_nodriver_input(search_input, page, search_term, with_typos=True)
             
-            await asyncio.sleep(1)
-            
             # Press Enter
             await human.keyboard.press_key('enter')
             print("   ✓ Search submitted!")
-            await asyncio.sleep(3)
+            
+            # Wait for page to load and human to read
+            await human.wait_for_page(page)
             
     except Exception as e:
         print(f"   Search failed: {e}")
     
     # =========================================================================
-    # Demo 3: Scroll down the page
+    # Demo 2: Scroll down the page
     # =========================================================================
-    print("\n📜 Demo 3: Scrolling the page...")
+    print("\n📜 Demo 2: Scrolling the page...")
     
     try:
         # Move mouse to middle of page first
@@ -142,20 +123,15 @@ async def main():
         center_y = bounds.top + bounds.height // 2
         
         await human.mouse.move_to(center_x, center_y, target_width=100)
-        await asyncio.sleep(0.5)
         
         # Scroll down
         print("   Scrolling down...")
         await human.mouse.scroll(-5)  # Negative = scroll down
-        await asyncio.sleep(1)
-        
         await human.mouse.scroll(-5)
-        await asyncio.sleep(1)
         
         # Scroll back up
         print("   Scrolling back up...")
         await human.mouse.scroll(3)
-        await asyncio.sleep(1)
         
         print("   ✓ Scrolling complete!")
         
@@ -163,9 +139,9 @@ async def main():
         print(f"   Scrolling failed: {e}")
     
     # =========================================================================
-    # Demo 4: Click on some links in the article
+    # Demo 3: Click on some links in the article
     # =========================================================================
-    print("\n🔗 Demo 4: Clicking links in the article...")
+    print("\n🔗 Demo 3: Clicking links in the article...")
     
     try:
         # Find links in the main content area
@@ -191,11 +167,12 @@ async def main():
                     
                     await human.click_nodriver_element(link, page)
                     
-                    await asyncio.sleep(2)
+                    # Wait for page to load and brief reading
+                    await human.wait_for_page(page, min_read_time=0.3, max_read_time=0.8)
                     
                     # Go back
                     await page.back()
-                    await asyncio.sleep(1.5)
+                    await human.wait_for_page(page, min_read_time=0.2, max_read_time=0.6)
                     
                 except Exception as e:
                     continue
@@ -206,67 +183,16 @@ async def main():
         print(f"   Link clicking failed: {e}")
     
     # =========================================================================
-    # Demo 5: Toggle dark mode
+    # Demo 4: Search again from current page (no homepage return!)
     # =========================================================================
-    print("\n🌙 Demo 5: Toggling dark mode...")
+    print("\n👤 Demo 4: Searching for 'Super44' from article...")
+    print("   (Notice we stay on the current page - more natural browsing!)")
     
     try:
-        # Navigate to main page first
-        await page.get('https://en.wikipedia.org')
-        await asyncio.sleep(2)
+        # Scroll to top so search bar is visible
+        await page.evaluate("window.scrollTo(0, 0)")
         
-        # Look for the appearance/theme toggle button
-        # Wikipedia's theme toggle can be in different places depending on login state
-        # Try common selectors
-        theme_selectors = [
-            'button[title*="appearance"]',
-            'button[title*="theme"]',
-            'a[title*="appearance"]',
-            '#vector-appearance-dropdown-checkbox',
-            '.vector-appearance-landmark button',
-        ]
-        
-        theme_button = None
-        for selector in theme_selectors:
-            try:
-                theme_button = await page.select(selector, timeout=1)
-                if theme_button:
-                    break
-            except Exception:
-                continue
-        
-        if theme_button:
-            print("   Found theme toggle button, clicking...")
-            await human.click_nodriver_element(theme_button, page)
-            await asyncio.sleep(0.5)
-            
-            # Try to click on dark mode option if menu appeared
-            try:
-                dark_mode_option = await page.select('input[value="night"], button:has-text("Dark")', timeout=1)
-                if dark_mode_option:
-                    print("   Clicking dark mode option...")
-                    await human.click_nodriver_element(dark_mode_option, page)
-                    await asyncio.sleep(1)
-                    print("   ✓ Dark mode toggled!")
-            except Exception:
-                print("   ✓ Theme menu opened!")
-        else:
-            print("   Theme toggle not found (may vary by Wikipedia version)")
-            
-    except Exception as e:
-        print(f"   Theme toggle demo skipped: {e}")
-    
-    # =========================================================================
-    # Demo 6: Search with custom username
-    # =========================================================================
-    print("\n👤 Demo 6: Searching for 'Super44'...")
-    
-    try:
-        # Navigate to main page to ensure we have a fresh search box
-        await page.get('https://en.wikipedia.org')
-        await asyncio.sleep(2)
-        
-        # Find search input
+        # Find search input on current page
         search_input = await page.select('input[name="search"]')
         if search_input:
             username = "Super44"
@@ -282,15 +208,29 @@ async def main():
                 with_typos=False   # Keep it clean for username
             )
             
-            await asyncio.sleep(0.5)
-            
             # Press Enter to search
             await human.keyboard.press_key('enter')
             print("   ✓ Search submitted!")
-            await asyncio.sleep(2)
+            
+            # Wait for page to load
+            await human.wait_for_page(page)
             
     except Exception as e:
-        print(f"   Username search demo failed: {e}")
+        print(f"   Search demo failed: {e}")
+    
+    # =========================================================================
+    # Demo 5: Toggle dark mode (simple text-based clicking)
+    # =========================================================================
+    print("\n🌙 Demo 5: Clicking 'Dark' to toggle dark mode...")
+    
+    try:
+        # Simply click on text "Dark"
+        dark_option = await page.find('Dark', timeout=3)
+        await human.click_nodriver_element(dark_option, page)
+        print("   ✓ Dark mode toggled!")
+                
+    except Exception as e:
+        print(f"   (Skipped - Dark option not found: {e})")
     
     # =========================================================================
     # Finish
@@ -306,6 +246,9 @@ async def main():
     print("  • Typing had variable inter-key timing")
     print("  • Triple-click for targeted input clearing (not global Cmd+A)")
     print("  • Chrome height auto-detected for accurate clicking")
+    print("  • Automatic post-action delays (minimal, research-based)")
+    print("  • Elements automatically scroll into view before clicking")
+    print("  • Intelligent page load waiting + human reading time")
     print("\nThese patterns match human neuromotor behavior and help")
     print("evade behavioral biometric detection systems.\n")
     
