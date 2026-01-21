@@ -200,13 +200,13 @@ config = NeuromotorConfig(
     velocity_asymmetry=0.42,
     
     # Neuromotor noise
-    noise_coefficient=0.05,
+    noise_coefficient=0.02,  # 2% of velocity
     tremor_frequency=10.0,
-    tremor_amplitude=0.5,
+    tremor_amplitude=0.15,   # 0.15 pixels RMS
     
     # Path geometry
     path_curvature=0.15,
-    path_deviation=0.10,
+    path_deviation=0.12,
     
     # Submovement model
     primary_coverage=0.95,
@@ -216,11 +216,58 @@ config = NeuromotorConfig(
     # Sample rate
     sample_rate=60.0,
     
+    # Automatic delays (brief post-action pauses)
+    auto_delays=True,
+    post_click_delay=(0.05, 0.12),   # Visual feedback confirmation
+    post_type_delay=(0.05, 0.12),    # Brief pause after typing
+    post_scroll_delay=(0.15, 0.4),   # Reorientation after scroll
+    
     # Debug mode (slower, more visible)
     debug_mode=False,
 )
 
+# Optional: configure keyboard timing
+keyboard_config = KeyboardTimingParams(
+    typo_rate=0.02,  # 2% chance of typo (realistic default)
+)
+
+human = NeuromotorInput(mouse_config=config, keyboard_config=keyboard_config)
+```
+
+### Automatic Post-Action Delays
+
+The library includes minimal automatic delays after actions to simulate brief cognitive processing:
+
+```python
+config = NeuromotorConfig(
+    auto_delays=True,  # Enable automatic delays (default: True)
+    
+    # Post-action delays (min, max) in seconds
+    post_click_delay=(0.05, 0.12),   # Visual feedback confirmation
+    post_type_delay=(0.05, 0.12),    # Brief pause after typing
+    post_scroll_delay=(0.15, 0.4),   # Reorientation after scroll
+)
+```
+
+**Note:** These are minimal delays representing basic visual feedback processing. For context-specific waits (page loads, reading content), use explicit delays:
+
+```python
+await human.click_nodriver_element(submit_button, page)
+await human.wait_for_page(page)  # Waits for page load + reading time
+
+# Or for general pauses:
+await human.wait_human(1.0, 2.0)  # Random 1-2 second pause
+```
+
+**Disable automatic delays for full manual control:**
+
+```python
+config = NeuromotorConfig(auto_delays=False)
 human = NeuromotorInput(mouse_config=config)
+
+# Now you control all timing explicitly
+await human.mouse.click()
+await asyncio.sleep(0.5)  # Your custom delay
 ```
 
 ### Persona-Based Configuration
@@ -326,7 +373,20 @@ await human.wait_for_page(page)  # Default: 300-1000ms reading time
 
 # Customize reading time based on content
 await human.wait_for_page(page, min_read_time=0.5, max_read_time=2.0)
+
+# Quick glance vs detailed reading
+await human.wait_for_page(page, min_read_time=0.2, max_read_time=0.6)  # Quick
+await human.wait_for_page(page, min_read_time=1.0, max_read_time=3.0)  # Detailed
+
+# Custom timeout for slow pages
+await human.wait_for_page(page, timeout=15.0)
 ```
+
+This method:
+- Waits for actual page load (document.readyState, network idle)
+- Has configurable timeout (default 10s)
+- Adds natural human reading/orientation delay
+- Continues gracefully if page load detection fails
 
 **Automatic scroll into view:**
 ```python

@@ -1850,8 +1850,9 @@ class NeuromotorInput:
                         });
                     }
                 """, element)
-                # Wait for smooth scroll to complete
-                await asyncio.sleep(random.uniform(0.3, 0.6))
+                # Wait for smooth scroll animation to complete
+                # Smooth scrolls can take 500-1000ms depending on distance
+                await asyncio.sleep(random.uniform(0.6, 1.0))
             except Exception:
                 pass  # Continue even if scroll fails
         

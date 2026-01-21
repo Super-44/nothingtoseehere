@@ -7,17 +7,23 @@ Demonstrates the nothingtoseehere library by:
 2. Scrolling the page with variable timing
 3. Clicking multiple article links with natural movement
 4. Searching again from article page for "Super44"
-5. Toggling dark mode (UI element interaction)
+5. Toggling dark mode (simple text-based clicking)
 
 Features showcased:
 - Human-like mouse kinematics (curved paths, asymmetric velocity)
+- Automatic coordinate conversion for nodriver elements
+- Automatic scroll-into-view for off-screen elements
+- Intelligent page load waiting with human reading time
 - Auto-detected browser chrome height
 - Triple-click for targeted input clearing (not global Cmd+A)
-- Realistic typing with typos and corrections
+- Realistic typing with typos and corrections (15% rate for demo visibility)
+- Automatic post-action delays (minimal, research-based)
 - Natural browsing flow without constant homepage returns
 - All movements follow neuromotor research patterns
 
 Run with: python examples/wikipedia_demo.py
+
+Note: The script includes automatic retry logic for intermittent browser connection issues.
 """
 
 import asyncio
@@ -66,14 +72,29 @@ async def main():
     human = NeuromotorInput(mouse_config=config, keyboard_config=keyboard_config)
     
     # Launch browser - visible, not headless
+    # Retry logic for intermittent connection issues
     print("📖 Opening browser and navigating to Wikipedia...")
-    browser = await uc.start(
-        headless=False,
-        browser_args=[
-            '--window-size=1200,900',
-            '--window-position=100,100',
-        ]
-    )
+    browser = None
+    for attempt in range(3):
+        try:
+            browser = await uc.start(
+                headless=False,
+                browser_args=[
+                    '--window-size=1200,900',
+                    '--window-position=100,100',
+                ]
+            )
+            break
+        except Exception as e:
+            if attempt < 2:
+                print(f"   Retry {attempt + 1}/3...")
+                await asyncio.sleep(1)
+            else:
+                print(f"\n❌ Failed to start browser after 3 attempts: {e}")
+                return
+    
+    if not browser:
+        return
     
     # Get the page
     page = await browser.get('https://en.wikipedia.org')
@@ -129,9 +150,10 @@ async def main():
         await human.mouse.scroll(-5)  # Negative = scroll down
         await human.mouse.scroll(-5)
         
-        # Scroll back up
+        # Scroll back up (mirror the down pattern)
         print("   Scrolling back up...")
-        await human.mouse.scroll(3)
+        await human.mouse.scroll(5)
+        await human.mouse.scroll(4)  # Slightly less to avoid overshooting
         
         print("   ✓ Scrolling complete!")
         
@@ -189,10 +211,7 @@ async def main():
     print("   (Notice we stay on the current page - more natural browsing!)")
     
     try:
-        # Scroll to top so search bar is visible
-        await page.evaluate("window.scrollTo(0, 0)")
-        
-        # Find search input on current page
+        # Find search input - library will auto-scroll it into view
         search_input = await page.select('input[name="search"]')
         if search_input:
             username = "Super44"
@@ -256,7 +275,12 @@ async def main():
     print("Browser will close in 5 seconds...")
     await asyncio.sleep(5)
     
-    browser.stop()
+    # Clean shutdown
+    try:
+        browser.stop()
+        await asyncio.sleep(1)  # Give it time to clean up
+    except Exception:
+        pass  # Ignore cleanup errors
 
 
 if __name__ == "__main__":
