@@ -66,7 +66,7 @@ from .neuromotor_input import (
     MODIFIER_KEY,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 __author__ = "Super44"
 __all__ = [
     # Main API

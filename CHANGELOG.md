@@ -5,6 +5,83 @@ All notable changes to nothingtoseehere will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-01-19
+
+### Added
+- **Intelligent page load waiting** 🌐
+  - New `wait_for_page()` method waits for actual page load + human reading time
+  - Checks `document.readyState` and network idle state
+  - Configurable timeout (default 10s) with graceful fallback
+  - Customizable reading/orientation time (default 300-1000ms)
+  - Example: `await human.wait_for_page(page, min_read_time=0.5, max_read_time=2.0)`
+  - No more guessing page load times!
+
+- **Automatic post-action delays** ⏱️
+  - Minimal delays after actions simulate brief cognitive processing
+  - Post-click: 50-120ms (visual feedback confirmation)
+  - Post-type: 50-120ms (brief pause)
+  - Post-scroll: 150-400ms (reorientation + visual search)
+  - Based on HCI research for visual search and feedback processing
+  - Configurable via `NeuromotorConfig.auto_delays`, `post_click_delay`, etc.
+  - Can be disabled entirely with `auto_delays=False`
+
+- **Automatic scroll-into-view** 📜
+  - Elements automatically scroll into view before clicking
+  - Uses smooth scrolling with proper animation timing (600-1000ms wait)
+  - Centers element in viewport for optimal visibility
+  - Enabled by default, can disable with `scroll_into_view=False`
+  - No more clicking on off-screen elements!
+
+- **Browser connection retry logic** 🔄
+  - Wikipedia demo now automatically retries browser connection (up to 3 attempts)
+  - Handles intermittent nodriver connection issues gracefully
+  - 1-second delay between retry attempts
+  - Clear error messages after all retries exhausted
+
+### Fixed
+- **Critical: Fixed viewport coordinate calculation** 🎯
+  - Changed from `element.get_position()` (document-relative) to `getBoundingClientRect()` (viewport-relative)
+  - Now correctly accounts for page scroll position
+  - Clicks land accurately even after scrolling the page
+  - Fixes issue where elements were clicked at wrong positions after scroll
+
+- **Improved scroll animation handling**
+  - Increased scroll-into-view wait time from 300-600ms to 600-1000ms
+  - Properly accounts for smooth scroll animations that can take 500-1000ms
+  - Fixes timing issues where clicks happened before scroll completed
+
+### Changed
+- **Simplified Wikipedia demo** 📖
+  - Removed broken "Random article" feature (Wikipedia removed that page)
+  - Natural browsing flow: search → read → explore → search again (no constant homepage returns)
+  - Dark mode toggle simplified to just find and click "Dark" text
+  - Increased typo rate to 15% for better demo visibility (default remains 2%)
+  - Better error handling and user feedback
+  - Showcases all new automatic features (no manual sleeps needed!)
+
+- **Enhanced `wait_human()` documentation**
+  - Clarified use cases: reading, thinking, general pauses
+  - Distinguished from `wait_for_page()` for page load scenarios
+
+### Documentation
+- **Updated README.md**
+  - Added "Automatic Post-Action Delays" section with examples
+  - Enhanced nodriver integration section with all new features
+  - Added `wait_for_page()` usage examples and explanation
+  - Updated configuration examples with new delay parameters
+  - Fixed default values to match code (noise_coefficient, tremor_amplitude, path_deviation)
+
+- **Improved code comments**
+  - Better inline documentation for automatic delays
+  - Clarified research basis (or lack thereof) for post-action delays
+  - Added troubleshooting notes for browser connection issues
+
+### Compatibility
+- ✅ **100% backward compatible** - all existing code works without changes
+- All new features have sensible defaults
+- Auto-delays can be disabled for full manual control
+- No breaking changes to existing APIs
+
 ## [1.1.0] - 2026-01-14
 
 ### Fixed
